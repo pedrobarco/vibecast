@@ -118,10 +118,17 @@ func (m model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					m.chErr = fmt.Sprintf("Failed to load playlist: %v", err)
 				}
+				// Reset menu cursor to the selected playlist for when we return
+				m.cursor = m.cursor
 				m.mode = modeChannelList
 				return m, nil
 			}
 		}
+	}
+	// Always rebuild the menu from config to avoid duplicate entries
+	m.menu = []menuItem{{label: "Add playlist"}}
+	for _, pl := range m.cfg.Playlists {
+		m.menu = append(m.menu, menuItem{label: pl.Name})
 	}
 	return m, nil
 }
@@ -139,6 +146,12 @@ func (m model) updateAddPlaylist(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.menu = []menuItem{{label: "Add playlist"}}
 			for _, pl := range m.cfg.Playlists {
 				m.menu = append(m.menu, menuItem{label: pl.Name})
+			}
+			// Reset cursor to first playlist if any
+			if len(m.menu) > 1 {
+				m.cursor = 1
+			} else {
+				m.cursor = 0
 			}
 			return m, nil
 		case "tab", "shift+tab":
@@ -167,6 +180,7 @@ func (m model) updateAddPlaylist(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.menu = append(m.menu, menuItem{label: pl.Name})
 			}
 			m.mode = modeMenu
+			// Reset cursor to the newly added playlist
 			m.cursor = len(m.menu) - 1
 			return m, nil
 		default:
@@ -241,7 +255,8 @@ func (m model) viewMenu() string {
 	for i, item := range m.menu {
 		cursor := "  "
 		if m.cursor == i {
-			cursor = "➜ "
+			// Use a visible cursor for the selected item
+			cursor = "\033[7m➜\033[0m "
 		}
 		fmt.Fprintf(&b, "%s%s\n", cursor, item.label)
 	}
@@ -265,9 +280,8 @@ func (m model) viewChannelList() string {
 	for i, ch := range m.channels {
 		cursor := "  "
 		if m.chCursor == i {
-			cursor = "➜ "
-		} else {
-			cursor = "  "
+			// Use a visible cursor for the selected channel
+			cursor = "\033[7m➜\033[0m "
 		}
 		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
 	}
