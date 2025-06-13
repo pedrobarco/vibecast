@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,12 +29,12 @@ type addPlaylistForm struct {
 }
 
 type model struct {
-	cfg        *config.Config
-	menu       []menuItem
-	cursor     int
-	quitting   bool
-	mode       mode
-	addForm    addPlaylistForm
+	cfg      *config.Config
+	menu     []menuItem
+	cursor   int
+	quitting bool
+	mode     mode
+	addForm  addPlaylistForm
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
