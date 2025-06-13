@@ -21,6 +21,7 @@ const (
 	modeMenu mode = iota
 	modeAddPlaylist
 	modeChannelList
+	modeChannelSearch
 )
 
 type addPlaylistForm struct {
@@ -45,6 +46,11 @@ type model struct {
 	chPlIndex   int    // index of selected playlist in cfg.Playlists
 	chPlName    string // name of selected playlist
 	chErr       string // error loading channels
+
+	// Channel search mode
+	searchQuery string
+	filtered    []playlist.Channel
+	searchCursor int
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
@@ -78,6 +84,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateAddPlaylist(msg)
 	case modeChannelList:
 		return m.updateChannelList(msg)
+	case modeChannelSearch:
+		return m.updateChannelSearch(msg)
 	default:
 		return m, nil
 	}
@@ -219,6 +227,12 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.chPlName = ""
 			m.chErr = ""
 			return m, nil
+		case "/":
+			m.mode = modeChannelSearch
+			m.searchQuery = ""
+			m.filtered = m.channels
+			m.searchCursor = 0
+			return m, nil
 		case "j", "down":
 			if m.chCursor < len(m.channels)-1 {
 				m.chCursor++
@@ -247,6 +261,8 @@ func (m model) View() string {
 		return m.viewAddPlaylist()
 	case modeChannelList:
 		return m.viewChannelList()
+	case modeChannelSearch:
+		return m.viewChannelSearch()
 	default:
 		return ""
 	}
@@ -308,7 +324,7 @@ func (m model) viewChannelList() string {
 		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
 	}
 	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.channels)))
-	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
+	b.WriteString("\n[j/k] move  [enter] play  [/] search  [esc] back  [ctrl+c] quit")
 	return b.String()
 }
 
@@ -328,5 +344,90 @@ func (m model) viewAddPlaylist() string {
 		fmt.Fprintf(&b, "\n[!] %s\n", m.addForm.errMsg)
 	}
 	b.WriteString("\n[tab] switch field  [enter] submit  [esc] cancel  [ctrl+c] quit")
+	return b.String()
+}
+func (m model) updateChannelSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyRunes:
+			m.searchQuery += msg.String()
+		case tea.KeyBackspace:
+			if len(m.searchQuery) > 0 {
+				m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			}
+		}
+		switch msg.String() {
+		case "esc":
+			m.mode = modeChannelList
+			m.searchQuery = ""
+			m.filtered = nil
+			m.searchCursor = 0
+			return m, nil
+		case "j", "down":
+			if m.searchCursor < len(m.filtered)-1 {
+				m.searchCursor++
+			}
+		case "k", "up":
+			if m.searchCursor > 0 {
+				m.searchCursor--
+			}
+		case "enter":
+			if m.searchCursor >= 0 && m.searchCursor < len(m.filtered) {
+				_ = player.PlayWithVLC(m.filtered[m.searchCursor].URL)
+			}
+		}
+		// Update filtered list
+		m.filtered = nil
+		lq := strings.ToLower(m.searchQuery)
+		for _, ch := range m.channels {
+			if strings.Contains(strings.ToLower(ch.Name), lq) {
+				m.filtered = append(m.filtered, ch)
+			}
+		}
+		// Reset cursor if out of bounds
+		if m.searchCursor >= len(m.filtered) {
+			m.searchCursor = len(m.filtered) - 1
+		}
+		if m.searchCursor < 0 {
+			m.searchCursor = 0
+		}
+	}
+	return m, nil
+}
+
+func (m model) viewChannelSearch() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Search: /%s\n\n", m.searchQuery)
+	if len(m.filtered) == 0 {
+		b.WriteString("No channels found.\n")
+		b.WriteString("\n[esc] back  [ctrl+c] quit")
+		return b.String()
+	}
+	const windowSize = 15
+	start := m.searchCursor - windowSize/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + windowSize
+	if end > len(m.filtered) {
+		end = len(m.filtered)
+	}
+	if end-start < windowSize && end == len(m.filtered) {
+		start = end - windowSize
+		if start < 0 {
+			start = 0
+		}
+	}
+	for i := start; i < end; i++ {
+		ch := m.filtered[i]
+		cursor := "  "
+		if m.searchCursor == i {
+			cursor = "\033[7m➜\033[0m "
+		}
+		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
+	}
+	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.filtered)))
+	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
 	return b.String()
 }
