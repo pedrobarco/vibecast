@@ -135,6 +135,11 @@ func (m model) updateAddPlaylist(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "esc":
 			m.mode = modeMenu
+			// Rebuild menu from config to avoid duplicate entries
+			m.menu = []menuItem{{label: "Add playlist"}}
+			for _, pl := range m.cfg.Playlists {
+				m.menu = append(m.menu, menuItem{label: pl.Name})
+			}
 			return m, nil
 		case "tab", "shift+tab":
 			m.addForm.focus = 1 - m.addForm.focus
@@ -156,8 +161,11 @@ func (m model) updateAddPlaylist(msg tea.Msg) (tea.Model, tea.Cmd) {
 			home := os.Getenv("HOME")
 			cfgPath := home + "/.config/vibecast/config.yaml"
 			_ = config.Save(cfgPath, m.cfg)
-			// Update menu
-			m.menu = append(m.menu, menuItem{label: m.addForm.name})
+			// Rebuild menu from config to avoid duplicate entries
+			m.menu = []menuItem{{label: "Add playlist"}}
+			for _, pl := range m.cfg.Playlists {
+				m.menu = append(m.menu, menuItem{label: pl.Name})
+			}
 			m.mode = modeMenu
 			m.cursor = len(m.menu) - 1
 			return m, nil
@@ -190,6 +198,9 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.mode = modeMenu
 			m.chCursor = 0
+			m.channels = nil
+			m.chPlName = ""
+			m.chErr = ""
 			return m, nil
 		case "j", "down":
 			if m.chCursor < len(m.channels)-1 {
@@ -255,6 +266,8 @@ func (m model) viewChannelList() string {
 		cursor := "  "
 		if m.chCursor == i {
 			cursor = "➜ "
+		} else {
+			cursor = "  "
 		}
 		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
 	}
