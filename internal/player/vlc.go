@@ -42,7 +42,15 @@ func StartVLCWithRC(port int) error {
 	vlcCmd.Stdout = nil
 	vlcCmd.Stderr = nil
 
-	return vlcCmd.Start()
+	// Start VLC in the background and do not wait for it
+	if err := vlcCmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		// Reap the process so it doesn't become a zombie
+		_ = vlcCmd.Wait()
+	}()
+	return nil
 }
 
 // ConnectToVLC connects to the VLC RC interface.
