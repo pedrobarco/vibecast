@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -28,6 +30,18 @@ func StartVLCWithRC(port int) error {
 		"--quiet",
 	}
 	vlcCmd = exec.Command("vlc", args...)
+
+	// Detach VLC process so it doesn't block the TUI (macOS/Linux)
+	if runtime.GOOS != "windows" {
+		vlcCmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+		}
+	}
+
+	// Redirect stdout/stderr to avoid blocking if VLC writes output
+	vlcCmd.Stdout = nil
+	vlcCmd.Stderr = nil
+
 	return vlcCmd.Start()
 }
 
