@@ -24,8 +24,6 @@ const (
 	modeAddPlaylist
 	modeChannelList
 	modeChannelSearchInput
-	modeChannelSearchBrowse
-	modeFavouritesList
 )
 
 type addPlaylistForm struct {
@@ -51,14 +49,11 @@ type model struct {
 	chPlName    string // name of selected playlist
 	chErr       string // error loading channels
 
-	// Channel search mode
+	// Filtering/bookmark modifiers
 	searchQuery string
+	showOnlyBookmarks bool
 	filtered    []playlist.Channel
 	searchCursor int
-
-	// Favourites mode
-	favChannels []playlist.Channel
-	favCursor   int
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
@@ -94,10 +89,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateChannelList(msg)
 	case modeChannelSearchInput:
 		return m.updateChannelSearchInput(msg)
-	case modeChannelSearchBrowse:
-		return m.updateChannelSearchBrowse(msg)
-	case modeFavouritesList:
-		return m.updateFavouritesList(msg)
 	default:
 		return m, nil
 	}
@@ -238,33 +229,23 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.channels = nil
 			m.chPlName = ""
 			m.chErr = ""
+			m.searchQuery = ""
+			m.showOnlyBookmarks = false
 			return m, nil
 		case "/":
 			m.mode = modeChannelSearchInput
 			m.searchQuery = ""
-			m.filtered = m.channels
 			m.searchCursor = m.chCursor
 			return m, nil
 		case "b":
-			// Show favourites for this playlist
-			favs := m.cfg.Favourites[m.chPlName]
-			var favChannels []playlist.Channel
-			for _, ch := range m.channels {
-				for _, fav := range favs {
-					if ch.Name == fav {
-						favChannels = append(favChannels, ch)
-						break
-					}
-				}
-			}
-			m.favChannels = favChannels
-			m.favCursor = 0
-			m.mode = modeFavouritesList
+			m.showOnlyBookmarks = !m.showOnlyBookmarks
+			m.chCursor = 0
 			return m, nil
 		case "m":
 			// Toggle favourite for this channel
-			if m.chCursor >= 0 && m.chCursor < len(m.channels) {
-				ch := m.channels[m.chCursor]
+			visible := m.visibleChannels()
+			if m.chCursor >= 0 && m.chCursor < len(visible) {
+				ch := visible[m.chCursor]
 				if favourites.IsFavourite(m.cfg.Favourites, m.chPlName, ch.Name) {
 					favourites.RemoveFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
 				} else {
@@ -277,7 +258,8 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "j", "down":
-			if m.chCursor < len(m.channels)-1 {
+			visible := m.visibleChannels()
+			if m.chCursor < len(visible)-1 {
 				m.chCursor++
 			}
 		case "k", "up":
@@ -285,8 +267,9 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.chCursor--
 			}
 		case "enter":
-			if m.chCursor >= 0 && m.chCursor < len(m.channels) && m.chErr == "" {
-				_ = player.PlayWithVLC(m.channels[m.chCursor].URL)
+			visible := m.visibleChannels()
+			if m.chCursor >= 0 && m.chCursor < len(visible) && m.chErr == "" {
+				_ = player.PlayWithVLC(visible[m.chCursor].URL)
 			}
 		}
 	}
@@ -306,10 +289,6 @@ func (m model) View() string {
 		return m.viewChannelList()
 	case modeChannelSearchInput:
 		return m.viewChannelSearchInput()
-	case modeChannelSearchBrowse:
-		return m.viewChannelSearchBrowse()
-	case modeFavouritesList:
-		return m.viewFavouritesList()
 	default:
 		return ""
 	}
@@ -330,6 +309,30 @@ func (m model) viewMenu() string {
 	return b.String()
 }
 
+func (m model) visibleChannels() []playlist.Channel {
+	chans := m.channels
+	if m.showOnlyBookmarks {
+		var filtered []playlist.Channel
+		for _, ch := range chans {
+			if favourites.IsFavourite(m.cfg.Favourites, m.chPlName, ch.Name) {
+				filtered = append(filtered, ch)
+			}
+		}
+		chans = filtered
+	}
+	if m.searchQuery != "" {
+		var filtered []playlist.Channel
+		lq := strings.ToLower(m.searchQuery)
+		for _, ch := range chans {
+			if fuzzy.Match(lq, strings.ToLower(ch.Name)) {
+				filtered = append(filtered, ch)
+			}
+		}
+		chans = filtered
+	}
+	return chans
+}
+
 func (m model) viewChannelList() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Playlist: %s\n\n", m.chPlName)
@@ -338,7 +341,8 @@ func (m model) viewChannelList() string {
 		b.WriteString("\n[esc] back  [ctrl+c] quit")
 		return b.String()
 	}
-	if len(m.channels) == 0 {
+	visible := m.visibleChannels()
+	if len(visible) == 0 {
 		b.WriteString("No channels found.\n")
 		b.WriteString("\n[esc] back  [ctrl+c] quit")
 		return b.String()
@@ -351,10 +355,10 @@ func (m model) viewChannelList() string {
 		start = 0
 	}
 	end := start + windowSize
-	if end > len(m.channels) {
-		end = len(m.channels)
+	if end > len(visible) {
+		end = len(visible)
 	}
-	if end-start < windowSize && end == len(m.channels) {
+	if end-start < windowSize && end == len(visible) {
 		start = end - windowSize
 		if start < 0 {
 			start = 0
@@ -362,20 +366,25 @@ func (m model) viewChannelList() string {
 	}
 
 	for i := start; i < end; i++ {
-		ch := m.channels[i]
+		ch := visible[i]
 		cursor := "  "
 		star := " "
 		if favourites.IsFavourite(m.cfg.Favourites, m.chPlName, ch.Name) {
 			star = "★"
 		}
 		if m.chCursor == i {
-			// Use a visible cursor for the selected channel
 			cursor = "\033[7m➜\033[0m "
 		}
 		fmt.Fprintf(&b, "%s%s %s\n", cursor, star, ch.Name)
 	}
-	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.channels)))
-	b.WriteString("\n[j/k] move  [enter] play  [/] search  [m] mark/unmark  [b] bookmarks  [esc] back  [ctrl+c] quit")
+	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(visible)))
+	b.WriteString("\n[j/k] move  [enter] play  [/] search  [b] bookmarks  [m] mark/unmark  [esc] back  [ctrl+c] quit")
+	if m.showOnlyBookmarks {
+		b.WriteString(" [BOOKMARKS]")
+	}
+	if m.searchQuery != "" {
+		b.WriteString(fmt.Sprintf(" [SEARCH: %s]", m.searchQuery))
+	}
 	return b.String()
 }
 
@@ -410,58 +419,9 @@ func (m model) updateChannelSearchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "esc":
-			// If there is a query, go to browse filtered, else go back to all channels
-			if m.searchQuery != "" {
-				// Update filtered list before switching
-				m.filtered = nil
-				lq := strings.ToLower(m.searchQuery)
-				for _, ch := range m.channels {
-					if fuzzy.Match(lq, strings.ToLower(ch.Name)) {
-						m.filtered = append(m.filtered, ch)
-					}
-				}
-				if m.searchCursor >= len(m.filtered) {
-					m.searchCursor = len(m.filtered) - 1
-				}
-				if m.searchCursor < 0 {
-					m.searchCursor = 0
-				}
-				m.mode = modeChannelSearchBrowse
-				return m, nil
-			} else {
-				m.mode = modeChannelList
-				m.filtered = nil
-				m.searchCursor = 0
-				return m, nil
-			}
-		case "j", "down":
-			// allow navigation while searching
-			if m.searchCursor < len(m.filtered)-1 {
-				m.searchCursor++
-			}
-		case "k", "up":
-			if m.searchCursor > 0 {
-				m.searchCursor--
-			}
-		case "enter":
-			if m.searchCursor >= 0 && m.searchCursor < len(m.filtered) {
-				_ = player.PlayWithVLC(m.filtered[m.searchCursor].URL)
-			}
-		}
-		// Update filtered list
-		m.filtered = nil
-		lq := strings.ToLower(m.searchQuery)
-		for _, ch := range m.channels {
-			if fuzzy.Match(lq, strings.ToLower(ch.Name)) {
-				m.filtered = append(m.filtered, ch)
-			}
-		}
-		// Reset cursor if out of bounds
-		if m.searchCursor >= len(m.filtered) {
-			m.searchCursor = len(m.filtered) - 1
-		}
-		if m.searchCursor < 0 {
-			m.searchCursor = 0
+			m.mode = modeChannelList
+			m.chCursor = 0
+			return m, nil
 		}
 	}
 	return m, nil
@@ -531,37 +491,42 @@ func (m model) updateChannelSearchBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) viewChannelSearchInput() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Search: /%s\n\n", m.searchQuery)
-	if len(m.filtered) == 0 {
+	b.WriteString(fmt.Sprintf("Search: /%s\n\n", m.searchQuery))
+	visible := m.visibleChannels()
+	if len(visible) == 0 {
 		b.WriteString("No channels found.\n")
 		b.WriteString("\n[esc] back  [ctrl+c] quit")
 		return b.String()
 	}
 	const windowSize = 15
-	start := m.searchCursor - windowSize/2
+	start := m.chCursor - windowSize/2
 	if start < 0 {
 		start = 0
 	}
 	end := start + windowSize
-	if end > len(m.filtered) {
-		end = len(m.filtered)
+	if end > len(visible) {
+		end = len(visible)
 	}
-	if end-start < windowSize && end == len(m.filtered) {
+	if end-start < windowSize && end == len(visible) {
 		start = end - windowSize
 		if start < 0 {
 			start = 0
 		}
 	}
 	for i := start; i < end; i++ {
-		ch := m.filtered[i]
+		ch := visible[i]
 		cursor := "  "
-		if m.searchCursor == i {
+		star := " "
+		if favourites.IsFavourite(m.cfg.Favourites, m.chPlName, ch.Name) {
+			star = "★"
+		}
+		if m.chCursor == i {
 			cursor = "\033[7m➜\033[0m "
 		}
-		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
+		fmt.Fprintf(&b, "%s%s %s\n", cursor, star, ch.Name)
 	}
-	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.filtered)))
-	b.WriteString("\n[j/k] move  [enter] play  [esc] browse filtered  [ctrl+c] quit")
+	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(visible)))
+	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
 	return b.String()
 }
 
