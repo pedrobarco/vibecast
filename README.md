@@ -1,6 +1,6 @@
 # Vibecast
 
-*A fast, keyboard-driven TUI for managing and playing IPTV playlists.*
+_A fast, keyboard-driven TUI for managing and playing IPTV playlists._
 
 [![Go Version](https://img.shields.io/badge/go-1.22+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/github/license/pedrobarco/vibecast)](./LICENSE)
@@ -16,7 +16,6 @@
 - [Configuration](#configuration)
 - [Supported Players](#supported-players)
 - [Supported Playlist Formats](#supported-playlist-formats)
-- [FAQ / Troubleshooting](#faq--troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -24,10 +23,11 @@
 
 ## Overview
 
-**Vibecast** is a terminal user interface (TUI) for managing, searching, and playing IPTV playlists.  
-It is player-agnostic and library-agnostic: you can use it with any player that supports opening URLs from the command line (e.g., VLC, mpv, etc.).
+**Vibecast** is a terminal user interface (TUI) for managing, searching, and playing IPTV playlists.
+It is player-agnostic: you can use it with any player that supports opening URLs from the command line (e.g., VLC, mpv, etc.).
 
 **Features:**
+
 - Add, remove, and edit IPTV playlists (local files or URLs)
 - Search and filter channels with fuzzy matching
 - Bookmark (favorite) channels per playlist
@@ -69,15 +69,15 @@ vibecast
 
 ### Keybindings
 
-| Key         | Action                                 |
-|-------------|----------------------------------------|
-| `j`/`k`     | Move down/up                           |
-| `enter`     | Select / Play channel                  |
-| `/`         | Search/filter channels                 |
-| `b`         | Toggle bookmarks view                  |
-| `m`         | Mark/unmark channel as bookmark        |
-| `esc`       | Go back / Cancel / Clear filter        |
-| `ctrl+c`    | Quit                                   |
+| Key      | Action                          |
+| -------- | ------------------------------- |
+| `j`/`k`  | Move down/up                    |
+| `enter`  | Select / Play channel           |
+| `/`      | Search/filter channels          |
+| `b`      | Toggle bookmarks view           |
+| `m`      | Mark/unmark channel as bookmark |
+| `esc`    | Go back / Cancel / Clear filter |
+| `ctrl+c` | Quit                            |
 
 ### Example Workflow
 
@@ -91,7 +91,7 @@ vibecast
 
 ## Configuration
 
-- The config file is stored at:  
+- The config file is stored at:
   `$HOME/.config/vibecast/config.yaml`
 
 - Example config:
@@ -134,26 +134,13 @@ You can configure your system to use your preferred player for streaming URLs.
 
 ---
 
-## FAQ / Troubleshooting
-
-**Q: I only hear audio, but don't see video in VLC.**  
-A: Make sure VLC is set as your system's default handler for streaming URLs, and that you are not running VLC in RC-only mode.
-
-**Q: How do I use a different player?**  
-A: Change your system's default handler for streaming URLs (e.g., set mpv as default for `http://` links).
-
-**Q: Where is my config stored?**  
-A: `$HOME/.config/vibecast/config.yaml`
-
----
-
 ## Contributing
 
-Contributions are welcome! Please open issues or pull requests.  
+Contributions are welcome! Please open issues or pull requests.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 ## License
 
-[MIT](./LICENSE) © 2024 Pedro Barco
+[MIT](./LICENSE) © 2025 Pedro Barco
