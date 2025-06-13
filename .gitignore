@@ -1,1 +1,62 @@
 .aider*
+# Aider
+.aider*
+.aider-history/
+.aider-archive/
+.aider.log
+
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+*.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.coverprofile
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories (remove the comment below if you use Go modules)
+vendor/
+
+# Go build cache
+*.cache
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# By default, GoLand IDEs create a .goland directory
+.goland/
+
+# Go module files (if you want to ignore them, but usually you don't)
+# go.mod
+# go.sum
+
+# GitHub Codespaces
+.devcontainer/
+
+# Node modules (if you use JS tooling)
+node_modules/
+
+# Coverage output
+coverage.*
+
+# Misc
+*.tmp
+*.bak
