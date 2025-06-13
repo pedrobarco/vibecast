@@ -2,113 +2,28 @@ package player
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
-	"sync"
+	"net"
+	"time"
 )
 
-var (
-	vlcCmd   *exec.Cmd
-	vlcMutex sync.Mutex
-	vlcPid   int
-)
-
-// PlayWithVLC launches VLC with the given URL if not running, or reuses the same process by sending a new URL.
+// PlayWithVLC connects to a running VLC instance with RC interface enabled and tells it to play the given URL.
+// VLC must be started by the user with: vlc --intf rc --rc-host 127.0.0.1:4212
 func PlayWithVLC(url string) error {
-	vlcMutex.Lock()
-	defer vlcMutex.Unlock()
-
-	// If VLC is not running, start it with the given URL
-	if vlcCmd == nil || vlcPid == 0 || !isProcessRunning(vlcPid) {
-		cmd := exec.Command("vlc", "--no-video-title-show", "--quiet", url)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		if err := cmd.Start(); err != nil {
-			return err
-		}
-		vlcCmd = cmd
-		vlcPid = cmd.Process.Pid
-		go func() {
-			_ = cmd.Wait()
-			vlcMutex.Lock()
-			vlcCmd = nil
-			vlcPid = 0
-			vlcMutex.Unlock()
-		}()
-		return nil
-	}
-
-	// If VLC is running, send the new URL to the running process using osascript (macOS only)
-	// This will use AppleScript to tell VLC to open the new URL in the same instance
-	// On Linux, you could use dbus or xdotool, but here we focus on macOS
-	if isMac() {
-		script := fmt.Sprintf(`tell application "VLC" to OpenURL "%s"`, url)
-		osascript := exec.Command("osascript", "-e", script)
-		return osascript.Run()
-	}
-
-	// On other platforms, fallback: kill and restart VLC with the new URL
-	_ = vlcCmd.Process.Kill()
-	vlcCmd = nil
-	vlcPid = 0
-	cmd := exec.Command("vlc", "--no-video-title-show", "--quiet", url)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	vlcCmd = cmd
-	vlcPid = cmd.Process.Pid
-	go func() {
-		_ = cmd.Wait()
-		vlcMutex.Lock()
-		vlcCmd = nil
-		vlcPid = 0
-		vlcMutex.Unlock()
-	}()
-	return nil
-}
-
-// isProcessRunning checks if a process with the given pid is running.
-func isProcessRunning(pid int) bool {
-	if pid == 0 {
-		return false
-	}
-	proc, err := os.FindProcess(pid)
+	const addr = "127.0.0.1:4212"
+	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 	if err != nil {
-		return false
+		return fmt.Errorf("could not connect to VLC RC interface at %s: %w", addr, err)
 	}
-	// On Unix, sending signal 0 checks for existence
-	err = proc.Signal(os.Signal(syscall(0)))
-	return err == nil
-}
+	defer conn.Close()
 
-// isMac returns true if running on macOS.
-func isMac() bool {
-	return strings.Contains(strings.ToLower(os.Getenv("OSTYPE")), "darwin") ||
-		strings.Contains(strings.ToLower(os.Getenv("GOOS")), "darwin") ||
-		(strings.Contains(strings.ToLower(os.Getenv("TERM_PROGRAM")), "apple") && os.Getenv("TERM_PROGRAM_VERSION") != "")
-}
+	// Wait for VLC RC prompt (may not be necessary, but helps with timing)
+	time.Sleep(200 * time.Millisecond)
 
-// StopVLC stops the VLC process if running.
-func StopVLC() error {
-	vlcMutex.Lock()
-	defer vlcMutex.Unlock()
-	if vlcCmd != nil {
-		_ = vlcCmd.Process.Kill()
-		vlcCmd = nil
-		vlcPid = 0
+	// Send "add" command to play the new URL
+	cmd := fmt.Sprintf("add %s\n", url)
+	_, err = conn.Write([]byte(cmd))
+	if err != nil {
+		return fmt.Errorf("failed to send command to VLC: %w", err)
 	}
 	return nil
-}
-
-// syscall is a helper to convert int to os.Signal for signal 0
-func syscall(sig int) os.Signal {
-	return os.Signal(syscallRaw(sig))
-}
-
-// syscallRaw is a platform-specific syscall number for signal 0
-func syscallRaw(sig int) int {
-	return sig
 }
