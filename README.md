@@ -26,6 +26,8 @@ _A fast, keyboard-driven TUI for managing and playing IPTV playlists._
 **Vibecast** is a terminal user interface (TUI) for managing, searching, and playing IPTV playlists.
 It is player-agnostic: you can use it with any player that supports opening URLs from the command line (e.g., VLC, mpv, etc.).
 
+> Vibecast is being developed using **vibe coding** – a collaborative, conversational, and incremental approach to building software.
+
 **Features:**
 
 - Add, remove, and edit IPTV playlists (local files or URLs)
