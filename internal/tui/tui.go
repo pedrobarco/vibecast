@@ -416,8 +416,9 @@ func (m model) updateChannelSearchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "esc":
+			// Cancel the filter/search
+			m.searchQuery = ""
 			m.mode = modeChannelList
-			// Don't reset cursor, keep position in filtered list
 			return m, nil
 		case "j", "down":
 			visible := m.visibleChannels()
@@ -429,10 +430,9 @@ func (m model) updateChannelSearchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.chCursor--
 			}
 		case "enter":
-			visible := m.visibleChannels()
-			if m.chCursor >= 0 && m.chCursor < len(visible) {
-				_ = player.PlayWithVLC(visible[m.chCursor].URL)
-			}
+			// Accept the filter and switch to the list view
+			m.mode = modeChannelList
+			return m, nil
 		}
 	}
 	return m, nil
