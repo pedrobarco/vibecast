@@ -14,21 +14,27 @@ type Playlist struct {
 }
 
 type Config struct {
-	Playlists  []Playlist `yaml:"playlists"`
-	Favourites []string   `yaml:"favourites,omitempty"`
+	Playlists  []Playlist            `yaml:"playlists"`
+	// Favourites is a map: playlist name -> list of channel names
+	Favourites map[string][]string   `yaml:"favourites,omitempty"`
 }
 
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &Config{}, nil // Return empty config if not found
+			return &Config{
+				Favourites: make(map[string][]string),
+			}, nil // Return empty config if not found
 		}
 		return nil, err
 	}
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
+	}
+	if cfg.Favourites == nil {
+		cfg.Favourites = make(map[string][]string)
 	}
 	return &cfg, nil
 }
