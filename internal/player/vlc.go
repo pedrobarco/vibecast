@@ -2,112 +2,114 @@ package player
 
 import (
 	"fmt"
-	"net"
+	"os"
 	"os/exec"
-	"runtime"
+	"strconv"
+	"strings"
 	"sync"
-	"syscall"
-	"time"
 )
 
 var (
 	vlcCmd   *exec.Cmd
 	vlcMutex sync.Mutex
-	vlcConn  net.Conn
+	vlcPid   int
 )
 
-// StartVLCWithRC starts VLC with the RC (remote control) interface on a local TCP port.
-func StartVLCWithRC(port int) error {
+// PlayWithVLC launches VLC with the given URL if not running, or reuses the same process by sending a new URL.
+func PlayWithVLC(url string) error {
 	vlcMutex.Lock()
 	defer vlcMutex.Unlock()
-	if vlcCmd != nil {
-		return nil // Already started
-	}
-	args := []string{
-		"--intf", "rc",
-		"--rc-host", fmt.Sprintf("127.0.0.1:%d", port),
-		"--no-video-title-show",
-		"--quiet",
-	}
-	vlcCmd = exec.Command("vlc", args...)
 
-	// Detach VLC process so it doesn't block the TUI (macOS/Linux)
-	if runtime.GOOS != "windows" {
-		vlcCmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
+	// If VLC is not running, start it with the given URL
+	if vlcCmd == nil || vlcPid == 0 || !isProcessRunning(vlcPid) {
+		cmd := exec.Command("vlc", "--no-video-title-show", "--quiet", url)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Start(); err != nil {
+			return err
 		}
+		vlcCmd = cmd
+		vlcPid = cmd.Process.Pid
+		go func() {
+			_ = cmd.Wait()
+			vlcMutex.Lock()
+			vlcCmd = nil
+			vlcPid = 0
+			vlcMutex.Unlock()
+		}()
+		return nil
 	}
 
-	// Redirect stdout/stderr to avoid blocking if VLC writes output
-	vlcCmd.Stdout = nil
-	vlcCmd.Stderr = nil
+	// If VLC is running, send the new URL to the running process using osascript (macOS only)
+	// This will use AppleScript to tell VLC to open the new URL in the same instance
+	// On Linux, you could use dbus or xdotool, but here we focus on macOS
+	if isMac() {
+		script := fmt.Sprintf(`tell application "VLC" to OpenURL "%s"`, url)
+		osascript := exec.Command("osascript", "-e", script)
+		return osascript.Run()
+	}
 
-	// Start VLC in the background and do not wait for it
-	if err := vlcCmd.Start(); err != nil {
+	// On other platforms, fallback: kill and restart VLC with the new URL
+	_ = vlcCmd.Process.Kill()
+	vlcCmd = nil
+	vlcPid = 0
+	cmd := exec.Command("vlc", "--no-video-title-show", "--quiet", url)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Start(); err != nil {
 		return err
 	}
+	vlcCmd = cmd
+	vlcPid = cmd.Process.Pid
 	go func() {
-		// Reap the process so it doesn't become a zombie
-		_ = vlcCmd.Wait()
+		_ = cmd.Wait()
+		vlcMutex.Lock()
+		vlcCmd = nil
+		vlcPid = 0
+		vlcMutex.Unlock()
 	}()
 	return nil
 }
 
-// ConnectToVLC connects to the VLC RC interface.
-func ConnectToVLC(port int) error {
-	vlcMutex.Lock()
-	defer vlcMutex.Unlock()
-	if vlcConn != nil {
-		return nil // Already connected
+// isProcessRunning checks if a process with the given pid is running.
+func isProcessRunning(pid int) bool {
+	if pid == 0 {
+		return false
 	}
-	var err error
-	for i := 0; i < 10; i++ {
-		vlcConn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-		if err == nil {
-			return nil
-		}
-		time.Sleep(300 * time.Millisecond)
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
 	}
-	return err
+	// On Unix, sending signal 0 checks for existence
+	err = proc.Signal(os.Signal(syscall(0)))
+	return err == nil
 }
 
-// PlayWithVLC switches the currently playing channel in a persistent VLC instance.
-func PlayWithVLC(url string) error {
-	const port = 4212
-	vlcMutex.Lock()
-	defer vlcMutex.Unlock()
-
-	// Start VLC if not running
-	if vlcCmd == nil {
-		if err := StartVLCWithRC(port); err != nil {
-			return err
-		}
-	}
-	// Connect to RC interface if not connected
-	if vlcConn == nil {
-		if err := ConnectToVLC(port); err != nil {
-			return err
-		}
-	}
-
-	// Send "add" command to play the new URL
-	cmd := fmt.Sprintf("add %s\n", url)
-	_, err := vlcConn.Write([]byte(cmd))
-	return err
+// isMac returns true if running on macOS.
+func isMac() bool {
+	return strings.Contains(strings.ToLower(os.Getenv("OSTYPE")), "darwin") ||
+		strings.Contains(strings.ToLower(os.Getenv("GOOS")), "darwin") ||
+		(strings.Contains(strings.ToLower(os.Getenv("TERM_PROGRAM")), "apple") && os.Getenv("TERM_PROGRAM_VERSION") != "")
 }
 
-// StopVLC stops the persistent VLC instance.
+// StopVLC stops the VLC process if running.
 func StopVLC() error {
 	vlcMutex.Lock()
 	defer vlcMutex.Unlock()
-	if vlcConn != nil {
-		vlcConn.Write([]byte("quit\n"))
-		vlcConn.Close()
-		vlcConn = nil
-	}
 	if vlcCmd != nil {
-		vlcCmd.Process.Kill()
+		_ = vlcCmd.Process.Kill()
 		vlcCmd = nil
+		vlcPid = 0
 	}
 	return nil
+}
+
+// syscall is a helper to convert int to os.Signal for signal 0
+func syscall(sig int) os.Signal {
+	return os.Signal(syscallRaw(sig))
+}
+
+// syscallRaw is a platform-specific syscall number for signal 0
+func syscallRaw(sig int) int {
+	return sig
 }
