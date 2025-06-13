@@ -7,6 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pedrobarco/vibecast/internal/config"
+	"github.com/pedrobarco/vibecast/internal/playlist"
+	"github.com/pedrobarco/vibecast/internal/player"
 )
 
 type menuItem struct {
@@ -18,6 +20,7 @@ type mode int
 const (
 	modeMenu mode = iota
 	modeAddPlaylist
+	modeChannelList
 )
 
 type addPlaylistForm struct {
@@ -29,12 +32,19 @@ type addPlaylistForm struct {
 }
 
 type model struct {
-	cfg      *config.Config
-	menu     []menuItem
-	cursor   int
-	quitting bool
-	mode     mode
-	addForm  addPlaylistForm
+	cfg         *config.Config
+	menu        []menuItem
+	cursor      int
+	quitting    bool
+	mode        mode
+	addForm     addPlaylistForm
+
+	// Channel list mode
+	channels    []playlist.Channel
+	chCursor    int
+	chPlIndex   int    // index of selected playlist in cfg.Playlists
+	chPlName    string // name of selected playlist
+	chErr       string // error loading channels
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
@@ -66,6 +76,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMenu(msg)
 	case modeAddPlaylist:
 		return m.updateAddPlaylist(msg)
+	case modeChannelList:
+		return m.updateChannelList(msg)
 	default:
 		return m, nil
 	}
@@ -93,7 +105,22 @@ func (m model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.addForm = addPlaylistForm{}
 				return m, nil
 			}
-			// TODO: handle selecting a playlist
+			// Select playlist (index in cfg.Playlists is m.cursor-1)
+			plIndex := m.cursor - 1
+			if plIndex >= 0 && plIndex < len(m.cfg.Playlists) {
+				pl := m.cfg.Playlists[plIndex]
+				chans, err := playlist.LoadM3U(pl.Path)
+				m.channels = chans
+				m.chCursor = 0
+				m.chPlIndex = plIndex
+				m.chPlName = pl.Name
+				m.chErr = ""
+				if err != nil {
+					m.chErr = fmt.Sprintf("Failed to load playlist: %v", err)
+				}
+				m.mode = modeChannelList
+				return m, nil
+			}
 		}
 	}
 	return m, nil
@@ -156,6 +183,31 @@ func (m model) updateAddPlaylist(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc":
+			m.mode = modeMenu
+			m.chCursor = 0
+			return m, nil
+		case "j", "down":
+			if m.chCursor < len(m.channels)-1 {
+				m.chCursor++
+			}
+		case "k", "up":
+			if m.chCursor > 0 {
+				m.chCursor--
+			}
+		case "enter":
+			if m.chCursor >= 0 && m.chCursor < len(m.channels) && m.chErr == "" {
+				_ = player.PlayWithVLC(m.channels[m.chCursor].URL)
+			}
+		}
+	}
+	return m, nil
+}
+
 func (m model) View() string {
 	if m.quitting {
 		return "Goodbye!\n"
@@ -165,6 +217,8 @@ func (m model) View() string {
 		return m.viewMenu()
 	case modeAddPlaylist:
 		return m.viewAddPlaylist()
+	case modeChannelList:
+		return m.viewChannelList()
 	default:
 		return ""
 	}
@@ -181,6 +235,30 @@ func (m model) viewMenu() string {
 		fmt.Fprintf(&b, "%s%s\n", cursor, item.label)
 	}
 	b.WriteString("\n[j/k] move  [enter] select  [ctrl+c] quit")
+	return b.String()
+}
+
+func (m model) viewChannelList() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Playlist: %s\n\n", m.chPlName)
+	if m.chErr != "" {
+		fmt.Fprintf(&b, "[!] %s\n", m.chErr)
+		b.WriteString("\n[esc] back  [ctrl+c] quit")
+		return b.String()
+	}
+	if len(m.channels) == 0 {
+		b.WriteString("No channels found.\n")
+		b.WriteString("\n[esc] back  [ctrl+c] quit")
+		return b.String()
+	}
+	for i, ch := range m.channels {
+		cursor := "  "
+		if m.chCursor == i {
+			cursor = "➜ "
+		}
+		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
+	}
+	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
 	return b.String()
 }
 
