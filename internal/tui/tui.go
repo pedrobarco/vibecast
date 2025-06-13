@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pedrobarco/vibecast/internal/config"
 	"github.com/pedrobarco/vibecast/internal/playlist"
 	"github.com/pedrobarco/vibecast/internal/player"
@@ -381,7 +382,7 @@ func (m model) updateChannelSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filtered = nil
 		lq := strings.ToLower(m.searchQuery)
 		for _, ch := range m.channels {
-			if strings.Contains(strings.ToLower(ch.Name), lq) {
+			if fuzzy.Match(lq, strings.ToLower(ch.Name)) {
 				m.filtered = append(m.filtered, ch)
 			}
 		}
