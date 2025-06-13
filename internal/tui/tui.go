@@ -126,9 +126,12 @@ func (m model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	// Always rebuild the menu from config to avoid duplicate entries
-	m.menu = []menuItem{{label: "Add playlist"}}
-	for _, pl := range m.cfg.Playlists {
-		m.menu = append(m.menu, menuItem{label: pl.Name})
+	// Only do this if not in channel list mode
+	if m.mode != modeChannelList {
+		m.menu = []menuItem{{label: "Add playlist"}}
+		for _, pl := range m.cfg.Playlists {
+			m.menu = append(m.menu, menuItem{label: pl.Name})
+		}
 	}
 	return m, nil
 }
@@ -277,7 +280,26 @@ func (m model) viewChannelList() string {
 		b.WriteString("\n[esc] back  [ctrl+c] quit")
 		return b.String()
 	}
-	for i, ch := range m.channels {
+
+	// Pagination: show only a window of channels around the cursor
+	const windowSize = 15
+	start := m.chCursor - windowSize/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + windowSize
+	if end > len(m.channels) {
+		end = len(m.channels)
+	}
+	if end-start < windowSize && end == len(m.channels) {
+		start = end - windowSize
+		if start < 0 {
+			start = 0
+		}
+	}
+
+	for i := start; i < end; i++ {
+		ch := m.channels[i]
 		cursor := "  "
 		if m.chCursor == i {
 			// Use a visible cursor for the selected channel
@@ -285,6 +307,7 @@ func (m model) viewChannelList() string {
 		}
 		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
 	}
+	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.channels)))
 	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
 	return b.String()
 }
