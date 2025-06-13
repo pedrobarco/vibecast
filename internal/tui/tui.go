@@ -235,14 +235,12 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			m.mode = modeChannelSearchInput
 			m.searchQuery = ""
-			m.searchCursor = m.chCursor
 			return m, nil
 		case "b":
 			m.showOnlyBookmarks = !m.showOnlyBookmarks
 			m.chCursor = 0
 			return m, nil
 		case "m":
-			// Toggle favourite for this channel
 			visible := m.visibleChannels()
 			if m.chCursor >= 0 && m.chCursor < len(visible) {
 				ch := visible[m.chCursor]
@@ -251,7 +249,6 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					favourites.AddFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
 				}
-				// Save config
 				home := os.Getenv("HOME")
 				cfgPath := home + "/.config/vibecast/config.yaml"
 				_ = config.Save(cfgPath, m.cfg)
@@ -320,7 +317,7 @@ func (m model) visibleChannels() []playlist.Channel {
 		}
 		chans = filtered
 	}
-	if m.searchQuery != "" {
+	if m.mode == modeChannelSearchInput && m.searchQuery != "" {
 		var filtered []playlist.Channel
 		lq := strings.ToLower(m.searchQuery)
 		for _, ch := range chans {
@@ -420,8 +417,22 @@ func (m model) updateChannelSearchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			m.mode = modeChannelList
-			m.chCursor = 0
+			// Don't reset cursor, keep position in filtered list
 			return m, nil
+		case "j", "down":
+			visible := m.visibleChannels()
+			if m.chCursor < len(visible)-1 {
+				m.chCursor++
+			}
+		case "k", "up":
+			if m.chCursor > 0 {
+				m.chCursor--
+			}
+		case "enter":
+			visible := m.visibleChannels()
+			if m.chCursor >= 0 && m.chCursor < len(visible) {
+				_ = player.PlayWithVLC(visible[m.chCursor].URL)
+			}
 		}
 	}
 	return m, nil
@@ -526,7 +537,7 @@ func (m model) viewChannelSearchInput() string {
 		fmt.Fprintf(&b, "%s%s %s\n", cursor, star, ch.Name)
 	}
 	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(visible)))
-	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
+	b.WriteString("\n[j/k] move  [enter] play  [esc] back to list  [ctrl+c] quit")
 	return b.String()
 }
 
