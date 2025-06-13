@@ -232,7 +232,7 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = modeChannelSearch
 			m.searchQuery = ""
 			m.filtered = m.channels
-			m.searchCursor = 0
+			m.searchCursor = m.chCursor
 			return m, nil
 		case "j", "down":
 			if m.chCursor < len(m.channels)-1 {
@@ -360,10 +360,19 @@ func (m model) updateChannelSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "esc":
-			m.mode = modeChannelList
+			// If already browsing filtered, go back to all channels, else stay in filtered browse
+			if m.mode == modeChannelSearch && m.searchQuery == "" {
+				m.mode = modeChannelList
+				m.filtered = nil
+				m.searchCursor = 0
+				return m, nil
+			}
+			// If there is a query, clear it and stay in filtered browse
 			m.searchQuery = ""
-			m.filtered = nil
-			m.searchCursor = 0
+			// Keep filtered as is, so user can browse
+			return m, nil
+		case "/":
+			// Go back to search input mode (no-op here, but could be used for future enhancements)
 			return m, nil
 		case "j", "down":
 			if m.searchCursor < len(m.filtered)-1 {
@@ -399,7 +408,11 @@ func (m model) updateChannelSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) viewChannelSearch() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Search: /%s\n\n", m.searchQuery)
+	if m.searchQuery != "" {
+		fmt.Fprintf(&b, "Search: /%s\n\n", m.searchQuery)
+	} else {
+		fmt.Fprintf(&b, "Filtered results (press / to search again, esc to show all):\n\n")
+	}
 	if len(m.filtered) == 0 {
 		b.WriteString("No channels found.\n")
 		b.WriteString("\n[esc] back  [ctrl+c] quit")
@@ -429,6 +442,10 @@ func (m model) viewChannelSearch() string {
 		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
 	}
 	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.filtered)))
-	b.WriteString("\n[j/k] move  [enter] play  [esc] back  [ctrl+c] quit")
+	if m.searchQuery != "" {
+		b.WriteString("\n[j/k] move  [enter] play  [esc] browse filtered  [ctrl+c] quit")
+	} else {
+		b.WriteString("\n[j/k] move  [enter] play  [/] search again  [esc] show all  [ctrl+c] quit")
+	}
 	return b.String()
 }
