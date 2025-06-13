@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -13,8 +14,8 @@ type Playlist struct {
 }
 
 type Config struct {
-	Playlists []Playlist `yaml:"playlists"`
-	Favourites []string  `yaml:"favourites,omitempty"`
+	Playlists  []Playlist `yaml:"playlists"`
+	Favourites []string   `yaml:"favourites,omitempty"`
 }
 
 func Load(path string) (*Config, error) {
