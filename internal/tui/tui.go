@@ -234,7 +234,7 @@ func (m model) updateChannelList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "/":
 			m.mode = modeChannelSearchInput
-			m.searchQuery = ""
+			// Don't reset searchQuery, allow editing
 			return m, nil
 		case "b":
 			m.showOnlyBookmarks = !m.showOnlyBookmarks
@@ -317,7 +317,7 @@ func (m model) visibleChannels() []playlist.Channel {
 		}
 		chans = filtered
 	}
-	if m.mode == modeChannelSearchInput && m.searchQuery != "" {
+	if m.searchQuery != "" {
 		var filtered []playlist.Channel
 		lq := strings.ToLower(m.searchQuery)
 		for _, ch := range chans {
@@ -438,67 +438,6 @@ func (m model) updateChannelSearchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) updateChannelSearchBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "/":
-			m.mode = modeChannelSearchInput
-			return m, nil
-		case "esc":
-			// Go back to all channels view
-			m.mode = modeChannelList
-			m.filtered = nil
-			m.searchQuery = ""
-			m.searchCursor = 0
-			return m, nil
-		case "m":
-			// Toggle favourite for this channel in filtered list
-			if m.searchCursor >= 0 && m.searchCursor < len(m.filtered) {
-				ch := m.filtered[m.searchCursor]
-				if favourites.IsFavourite(m.cfg.Favourites, m.chPlName, ch.Name) {
-					favourites.RemoveFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
-				} else {
-					favourites.AddFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
-				}
-				// Save config
-				home := os.Getenv("HOME")
-				cfgPath := home + "/.config/vibecast/config.yaml"
-				_ = config.Save(cfgPath, m.cfg)
-			}
-			return m, nil
-		case "b":
-			// Show favourites for this playlist
-			favs := m.cfg.Favourites[m.chPlName]
-			var favChannels []playlist.Channel
-			for _, ch := range m.channels {
-				for _, fav := range favs {
-					if ch.Name == fav {
-						favChannels = append(favChannels, ch)
-						break
-					}
-				}
-			}
-			m.favChannels = favChannels
-			m.favCursor = 0
-			m.mode = modeFavouritesList
-			return m, nil
-		case "j", "down":
-			if m.searchCursor < len(m.filtered)-1 {
-				m.searchCursor++
-			}
-		case "k", "up":
-			if m.searchCursor > 0 {
-				m.searchCursor--
-			}
-		case "enter":
-			if m.searchCursor >= 0 && m.searchCursor < len(m.filtered) {
-				_ = player.PlayWithVLC(m.filtered[m.searchCursor].URL)
-			}
-		}
-	}
-	return m, nil
-}
 
 func (m model) viewChannelSearchInput() string {
 	var b strings.Builder
@@ -541,113 +480,3 @@ func (m model) viewChannelSearchInput() string {
 	return b.String()
 }
 
-func (m model) viewChannelSearchBrowse() string {
-	var b strings.Builder
-	b.WriteString("Filtered results (press / to search again, esc to show all):\n\n")
-	if len(m.filtered) == 0 {
-		b.WriteString("No channels found.\n")
-		b.WriteString("\n[esc] back  [ctrl+c] quit")
-		return b.String()
-	}
-	const windowSize = 15
-	start := m.searchCursor - windowSize/2
-	if start < 0 {
-		start = 0
-	}
-	end := start + windowSize
-	if end > len(m.filtered) {
-		end = len(m.filtered)
-	}
-	if end-start < windowSize && end == len(m.filtered) {
-		start = end - windowSize
-		if start < 0 {
-			start = 0
-		}
-	}
-	for i := start; i < end; i++ {
-		ch := m.filtered[i]
-		cursor := "  "
-		if m.searchCursor == i {
-			cursor = "\033[7m➜\033[0m "
-		}
-		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
-	}
-	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d channels", start+1, end, len(m.filtered)))
-	b.WriteString("\n[j/k] move  [enter] play  [/] search again  [esc] show all  [ctrl+c] quit")
-	return b.String()
-}
-func (m model) updateFavouritesList(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc":
-			m.mode = modeChannelList
-			return m, nil
-		case "j", "down":
-			if m.favCursor < len(m.favChannels)-1 {
-				m.favCursor++
-			}
-		case "k", "up":
-			if m.favCursor > 0 {
-				m.favCursor--
-			}
-		case "m":
-			// Remove favourite
-			if m.favCursor >= 0 && m.favCursor < len(m.favChannels) {
-				ch := m.favChannels[m.favCursor]
-				favourites.RemoveFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
-				// Save config
-				home := os.Getenv("HOME")
-				cfgPath := home + "/.config/vibecast/config.yaml"
-				_ = config.Save(cfgPath, m.cfg)
-				// Remove from view
-				m.favChannels = append(m.favChannels[:m.favCursor], m.favChannels[m.favCursor+1:]...)
-				if m.favCursor >= len(m.favChannels) && m.favCursor > 0 {
-					m.favCursor--
-				}
-			}
-			return m, nil
-		case "enter":
-			if m.favCursor >= 0 && m.favCursor < len(m.favChannels) {
-				_ = player.PlayWithVLC(m.favChannels[m.favCursor].URL)
-			}
-		}
-	}
-	return m, nil
-}
-
-func (m model) viewFavouritesList() string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Favourites for playlist: %s\n\n", m.chPlName)
-	if len(m.favChannels) == 0 {
-		b.WriteString("No favourites yet.\n")
-		b.WriteString("\n[esc] back  [ctrl+c] quit")
-		return b.String()
-	}
-	const windowSize = 15
-	start := m.favCursor - windowSize/2
-	if start < 0 {
-		start = 0
-	}
-	end := start + windowSize
-	if end > len(m.favChannels) {
-		end = len(m.favChannels)
-	}
-	if end-start < windowSize && end == len(m.favChannels) {
-		start = end - windowSize
-		if start < 0 {
-			start = 0
-		}
-	}
-	for i := start; i < end; i++ {
-		ch := m.favChannels[i]
-		cursor := "  "
-		if m.favCursor == i {
-			cursor = "\033[7m➜\033[0m "
-		}
-		fmt.Fprintf(&b, "%s%s\n", cursor, ch.Name)
-	}
-	b.WriteString(fmt.Sprintf("\nShowing %d-%d of %d favourites", start+1, end, len(m.favChannels)))
-	b.WriteString("\n[j/k] move  [enter] play  [m] remove  [esc] back  [ctrl+c] quit")
-	return b.String()
-}
