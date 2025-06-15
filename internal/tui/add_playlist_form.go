@@ -17,7 +17,7 @@ type addPlaylistForm struct {
 	submitted bool
 }
 
-func updateAddPlaylistScreen(m model, msg tea.Msg) (model, tea.Cmd) {
+func updateAddPlaylistScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
