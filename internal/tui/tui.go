@@ -330,6 +330,24 @@ func (m model) visibleChannels() []playlist.Channel {
 	return chans
 }
 
+func paginate(length, cursor, windowSize int) (start, end int) {
+	start = cursor - windowSize/2
+	if start < 0 {
+		start = 0
+	}
+	end = start + windowSize
+	if end > length {
+		end = length
+	}
+	if end-start < windowSize && end == length {
+		start = end - windowSize
+		if start < 0 {
+			start = 0
+		}
+	}
+	return start, end
+}
+
 func (m model) viewChannelList() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Playlist: %s\n\n", m.chPlName)
@@ -345,22 +363,8 @@ func (m model) viewChannelList() string {
 		return b.String()
 	}
 
-	// Pagination: show only a window of channels around the cursor
 	const windowSize = 15
-	start := m.chCursor - windowSize/2
-	if start < 0 {
-		start = 0
-	}
-	end := start + windowSize
-	if end > len(visible) {
-		end = len(visible)
-	}
-	if end-start < windowSize && end == len(visible) {
-		start = end - windowSize
-		if start < 0 {
-			start = 0
-		}
-	}
+	start, end := paginate(len(visible), m.chCursor, windowSize)
 
 	for i := start; i < end; i++ {
 		ch := visible[i]
@@ -449,20 +453,7 @@ func (m model) viewChannelSearchInput() string {
 		return b.String()
 	}
 	const windowSize = 15
-	start := m.chCursor - windowSize/2
-	if start < 0 {
-		start = 0
-	}
-	end := start + windowSize
-	if end > len(visible) {
-		end = len(visible)
-	}
-	if end-start < windowSize && end == len(visible) {
-		start = end - windowSize
-		if start < 0 {
-			start = 0
-		}
-	}
+	start, end := paginate(len(visible), m.chCursor, windowSize)
 	for i := start; i < end; i++ {
 		ch := visible[i]
 		cursor := "  "
