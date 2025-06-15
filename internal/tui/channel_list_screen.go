@@ -115,9 +115,10 @@ func updateChannelSearchInputScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "esc":
-			// Cancel the filter/search and return to MenuModel
+			// Cancel the filter/search and return to the all channels list view
 			m.searchQuery = ""
-			return NewMenuModel(m.cfg), nil
+			m.mode = modeChannelList
+			return m, nil
 		case "j", "down":
 			visible := m.visibleChannels()
 			if m.chCursor < len(visible)-1 {
