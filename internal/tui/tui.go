@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -84,7 +83,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-
 func (m model) View() string {
 	if m.quitting {
 		return "Goodbye!\n"
@@ -102,7 +100,6 @@ func (m model) View() string {
 		return ""
 	}
 }
-
 
 func (m model) visibleChannels() []playlist.Channel {
 	chans := m.channels
