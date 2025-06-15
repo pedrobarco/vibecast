@@ -3,7 +3,9 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pedrobarco/vibecast/internal/config"
 )
 
