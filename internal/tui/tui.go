@@ -46,22 +46,7 @@ type model struct {
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
-	return tea.NewProgram(initialModel(cfg)).Run()
-}
-
-func initialModel(cfg *config.Config) model {
-	menu := []menuItem{
-		{label: "Add playlist"},
-	}
-	for _, pl := range cfg.Playlists {
-		menu = append(menu, menuItem{label: pl.Name})
-	}
-	return model{
-		cfg:    cfg,
-		menu:   menu,
-		cursor: 0,
-		mode:   modeMenu,
-	}
+	return tea.NewProgram(NewMenuModel(cfg)).Run()
 }
 
 func (m model) Init() tea.Cmd {
