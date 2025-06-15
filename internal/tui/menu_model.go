@@ -52,14 +52,24 @@ func (m *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.cursor == 0 {
 				// Add playlist
-				return NewAddPlaylistModel(m.cfg), nil
+				// Instead of returning a new model, signal to the legacy system to switch mode
+				return legacyModelFromMenu(m, modeAddPlaylist), nil
 			}
 			// Select playlist (index in cfg.Playlists is m.cursor-1)
 			plIndex := m.cursor - 1
 			if plIndex >= 0 && plIndex < len(m.cfg.Playlists) {
 				pl := m.cfg.Playlists[plIndex]
 				chans, err := playlist.LoadM3U(pl.Path)
-				return NewChannelListModel(m.cfg, plIndex, pl.Name, chans, err), nil
+				legacy := legacyModelFromMenu(m, modeChannelList)
+				legacy.channels = chans
+				legacy.chCursor = 0
+				legacy.chPlIndex = plIndex
+				legacy.chPlName = pl.Name
+				legacy.chErr = ""
+				if err != nil {
+					legacy.chErr = fmt.Sprintf("Failed to load playlist: %v", err)
+				}
+				return legacy, nil
 			}
 		}
 	}
@@ -69,6 +79,16 @@ func (m *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.menu = append(m.menu, menuItem{label: pl.Name})
 	}
 	return m, nil
+}
+
+// legacyModelFromMenu creates a legacy model from the MenuModel for compatibility with the old screens.
+func legacyModelFromMenu(m *MenuModel, nextMode mode) model {
+	return model{
+		cfg:    m.cfg,
+		menu:   m.menu,
+		cursor: m.cursor,
+		mode:   nextMode,
+	}
 }
 
 func (m *MenuModel) View() string {

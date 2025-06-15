@@ -3,11 +3,12 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pedrobarco/vibecast/internal/config"
-	"github.com/pedrobarco/vibecast/internal/player"
 	"github.com/pedrobarco/vibecast/internal/favourites"
+	"github.com/pedrobarco/vibecast/internal/player"
 )
 
 // Channel List Screen (modeChannelList)
