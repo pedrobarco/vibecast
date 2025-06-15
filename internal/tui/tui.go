@@ -2,15 +2,13 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pedrobarco/vibecast/internal/config"
-	"github.com/pedrobarco/vibecast/internal/playlist"
-	"github.com/pedrobarco/vibecast/internal/player"
 	"github.com/pedrobarco/vibecast/internal/favourites"
+	"github.com/pedrobarco/vibecast/internal/playlist"
 )
 
 type menuItem struct {
@@ -26,27 +24,26 @@ const (
 	modeChannelSearchInput
 )
 
-
 type model struct {
-	cfg         *config.Config
-	menu        []menuItem
-	cursor      int
-	quitting    bool
-	mode        mode
-	addForm     addPlaylistForm
+	cfg      *config.Config
+	menu     []menuItem
+	cursor   int
+	quitting bool
+	mode     mode
+	addForm  addPlaylistForm
 
 	// Channel list mode
-	channels    []playlist.Channel
-	chCursor    int
-	chPlIndex   int    // index of selected playlist in cfg.Playlists
-	chPlName    string // name of selected playlist
-	chErr       string // error loading channels
+	channels  []playlist.Channel
+	chCursor  int
+	chPlIndex int    // index of selected playlist in cfg.Playlists
+	chPlName  string // name of selected playlist
+	chErr     string // error loading channels
 
 	// Filtering/bookmark modifiers
-	searchQuery string
+	searchQuery       string
 	showOnlyBookmarks bool
-	filtered    []playlist.Channel
-	searchCursor int
+	filtered          []playlist.Channel
+	searchCursor      int
 }
 
 func Run(cfg *config.Config) (tea.Model, error) {
@@ -140,8 +137,6 @@ func (m model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-
-
 func (m model) View() string {
 	if m.quitting {
 		return "Goodbye!\n"
@@ -216,8 +211,3 @@ func paginate(length, cursor, windowSize int) (start, end int) {
 	}
 	return start, end
 }
-
-
-
-
-
