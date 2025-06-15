@@ -17,14 +17,8 @@ func updateChannelListScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			m.mode = modeMenu
-			m.chCursor = 0
-			m.channels = nil
-			m.chPlName = ""
-			m.chErr = ""
-			m.searchQuery = ""
-			m.showOnlyBookmarks = false
-			return m, nil
+			// Return to MenuModel
+			return NewMenuModel(m.cfg), nil
 		case "/":
 			m.mode = modeChannelSearchInput
 			// Don't reset searchQuery, allow editing
@@ -121,10 +115,9 @@ func updateChannelSearchInputScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "esc":
-			// Cancel the filter/search
+			// Cancel the filter/search and return to MenuModel
 			m.searchQuery = ""
-			m.mode = modeChannelList
-			return m, nil
+			return NewMenuModel(m.cfg), nil
 		case "j", "down":
 			visible := m.visibleChannels()
 			if m.chCursor < len(visible)-1 {

@@ -17,8 +17,7 @@ type menuItem struct {
 type mode int
 
 const (
-	modeMenu mode = iota
-	modeAddPlaylist
+	modeAddPlaylist mode = iota
 	modeChannelList
 	modeChannelSearchInput
 )
@@ -55,8 +54,6 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.mode {
-	case modeMenu:
-		return updateMenuScreen(m, msg)
 	case modeAddPlaylist:
 		return updateAddPlaylistScreen(m, msg)
 	case modeChannelList:
@@ -73,8 +70,6 @@ func (m model) View() string {
 		return "Goodbye!\n"
 	}
 	switch m.mode {
-	case modeMenu:
-		return viewMenuScreen(m)
 	case modeAddPlaylist:
 		return viewAddPlaylistScreen(m)
 	case modeChannelList:

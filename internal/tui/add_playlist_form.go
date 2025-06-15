@@ -25,19 +25,8 @@ func updateAddPlaylistScreen(m model, msg tea.Msg) (model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "esc":
-			m.mode = modeMenu
-			// Rebuild menu from config to avoid duplicate entries
-			m.menu = []menuItem{{label: "Add playlist"}}
-			for _, pl := range m.cfg.Playlists {
-				m.menu = append(m.menu, menuItem{label: pl.Name})
-			}
-			// Reset cursor to first playlist if any
-			if len(m.menu) > 1 {
-				m.cursor = 1
-			} else {
-				m.cursor = 0
-			}
-			return m, nil
+			// Return to MenuModel
+			return NewMenuModel(m.cfg), nil
 		case "tab", "shift+tab":
 			m.addForm.focus = 1 - m.addForm.focus
 		case "up", "k":
@@ -58,15 +47,8 @@ func updateAddPlaylistScreen(m model, msg tea.Msg) (model, tea.Cmd) {
 			home := os.Getenv("HOME")
 			cfgPath := home + "/.config/vibecast/config.yaml"
 			_ = config.Save(cfgPath, m.cfg)
-			// Rebuild menu from config to avoid duplicate entries
-			m.menu = []menuItem{{label: "Add playlist"}}
-			for _, pl := range m.cfg.Playlists {
-				m.menu = append(m.menu, menuItem{label: pl.Name})
-			}
-			m.mode = modeMenu
-			// Reset cursor to the newly added playlist
-			m.cursor = len(m.menu) - 1
-			return m, nil
+			// Return to MenuModel after adding playlist
+			return NewMenuModel(m.cfg), nil
 		default:
 			// Handle text input
 			if m.addForm.focus == 0 {
