@@ -17,13 +17,13 @@ type addPlaylistForm struct {
 	submitted bool
 }
 
-func (m *model) updateAddPlaylist(msg any) (model, func() tea.Msg) {
+func updateAddPlaylistScreen(m model, msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			m.quitting = true
-			return *m, tea.Quit
+			return m, tea.Quit
 		case "esc":
 			m.mode = modeMenu
 			// Rebuild menu from config to avoid duplicate entries
@@ -37,7 +37,7 @@ func (m *model) updateAddPlaylist(msg any) (model, func() tea.Msg) {
 			} else {
 				m.cursor = 0
 			}
-			return *m, nil
+			return m, nil
 		case "tab", "shift+tab":
 			m.addForm.focus = 1 - m.addForm.focus
 		case "up", "k":
@@ -47,7 +47,7 @@ func (m *model) updateAddPlaylist(msg any) (model, func() tea.Msg) {
 		case "enter":
 			if m.addForm.name == "" || m.addForm.path == "" {
 				m.addForm.errMsg = "Both fields are required"
-				return *m, nil
+				return m, nil
 			}
 			// Add playlist to config
 			m.cfg.Playlists = append(m.cfg.Playlists, config.Playlist{
@@ -66,7 +66,7 @@ func (m *model) updateAddPlaylist(msg any) (model, func() tea.Msg) {
 			m.mode = modeMenu
 			// Reset cursor to the newly added playlist
 			m.cursor = len(m.menu) - 1
-			return *m, nil
+			return m, nil
 		default:
 			// Handle text input
 			if m.addForm.focus == 0 {
@@ -86,10 +86,10 @@ func (m *model) updateAddPlaylist(msg any) (model, func() tea.Msg) {
 			}
 		}
 	}
-	return *m, nil
+	return m, nil
 }
 
-func (m model) viewAddPlaylist() string {
+func viewAddPlaylistScreen(m model) string {
 	var b strings.Builder
 	b.WriteString("Add Playlist\n\n")
 	nameLabel := "Name: "

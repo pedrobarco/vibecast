@@ -77,7 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case modeMenu:
 		return m.updateMenu(msg)
 	case modeAddPlaylist:
-		return m.updateAddPlaylist(msg)
+		return updateAddPlaylistScreen(m, msg)
 	case modeChannelList:
 		return m.updateChannelList(msg)
 	case modeChannelSearchInput:
@@ -203,7 +203,7 @@ func (m model) View() string {
 	case modeMenu:
 		return m.viewMenu()
 	case modeAddPlaylist:
-		return m.viewAddPlaylist()
+		return viewAddPlaylistScreen(m)
 	case modeChannelList:
 		return m.viewChannelList()
 	case modeChannelSearchInput:
