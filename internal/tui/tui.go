@@ -44,10 +44,6 @@ type model struct {
 	searchCursor      int
 }
 
-func Run(cfg *config.Config) (tea.Model, error) {
-	return tea.NewProgram(NewMenuModel(cfg)).Run()
-}
-
 func (m model) Init() tea.Cmd {
 	return nil
 }

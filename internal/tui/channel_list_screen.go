@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,9 +35,7 @@ func updateChannelListScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					favourites.AddFavourite(m.cfg.Favourites, m.chPlName, ch.Name)
 				}
-				home := os.Getenv("HOME")
-				cfgPath := home + "/.config/vibecast/config.yaml"
-				_ = config.Save(cfgPath, m.cfg)
+				_ = config.Save(m.cfg)
 			}
 			return m, nil
 		case "j", "down":

@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -44,9 +43,7 @@ func updateAddPlaylistScreen(m model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				Path: m.addForm.path,
 			})
 			// Save config
-			home := os.Getenv("HOME")
-			cfgPath := home + "/.config/vibecast/config.yaml"
-			_ = config.Save(cfgPath, m.cfg)
+			_ = config.Save(m.cfg)
 			// Return to MenuModel after adding playlist
 			return NewMenuModel(m.cfg), nil
 		default:

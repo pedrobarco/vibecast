@@ -8,19 +8,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	configPath = filepath.Join(os.Getenv("HOME"), ".config/vibecast/config.yaml")
+)
+
 type Playlist struct {
 	Name string `yaml:"name"`
 	Path string `yaml:"path"` // Can be file path or URL
 }
 
 type Config struct {
-	Playlists  []Playlist            `yaml:"playlists"`
+	Playlists []Playlist `yaml:"playlists"`
 	// Favourites is a map: playlist name -> list of channel names
-	Favourites map[string][]string   `yaml:"favourites,omitempty"`
+	Favourites map[string][]string `yaml:"favourites,omitempty"`
 }
 
-func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+func Load() (*Config, error) {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Config{
@@ -39,13 +43,13 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func Save(path string, cfg *Config) error {
+func Save(cfg *Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(configPath, data, 0o644)
 }
